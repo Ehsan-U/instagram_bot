@@ -1,0 +1,6 @@
+.env/
+.scrapy/
+test.py
+session.json
+data_samples/
+__pycache__/
