@@ -40,7 +40,7 @@ class InstaScraper(scrapy.Spider):
             userId = user.get("id")
             profileName = user.get("full_name")
             profileUrl = f"https://www.instagram.com/{user.get('username')}/"
-            profileDescription = user.get("biography")
+            profileDescription = user.get("biography",'') + ' ' + user.get("external_url") if user.get("external_url") else ''
             posts = user.get("edge_owner_to_timeline_media",{}).get("edges")
             if posts:
                 posts = posts[:30]
@@ -50,31 +50,32 @@ class InstaScraper(scrapy.Spider):
                 linksFrom30LatestPosts = ",".join(self.link_extractor.find_urls(self.get_text(posts)))
                 text_30LatestPostsDescription = self.get_text(posts)
                 emailFromLatestPostDescription = ",".join(self.email_regx.findall(self.get_text(posts[0:1])))
-            metricProfileNumberOfPosts = user.get("edge_owner_to_timeline_media",{}).get("count",0)
-            subscribers = user.get("edge_followed_by",{}).get('count',0)
-            linksFromProfileDescription = ",".join(self.link_extractor.find_urls(profileDescription))
-            keyword = keyword
-            emailfromChannelDescription = ",".join(self.email_regx.findall(profileDescription))
-            allow = self.allowed(subscribers, min_subs, cutoffdays, metric_LastUploadDate)
-            item = {
-                "channelId":userId,
-                "channelName":profileName,
-                "channelURL":profileUrl,
-                "metric_Subscribers":subscribers,
-                "channelDescription":profileDescription,
-                "canMessage":True,
-                "metric_ChannelNumberOfPosts":metricProfileNumberOfPosts,
-                "metric_LastUploadDate":metric_LastUploadDate,
-                "metric_Last30PostsDatePosted&NumberofComments":metric_Last30PostsDatePostedAndComments,
-                "metric_Last30PostsDatePosted&Reactions":metric_Last30PostsDatePostedAndReactions,
-                "text_30LatestPostsDescription":text_30LatestPostsDescription,
-                "linksfrom30LatestPosts":linksFrom30LatestPosts,
-                "emailFromLatestPostDescription":emailFromLatestPostDescription,
-                "linksFromProfileDescription":linksFromProfileDescription,
-                "emailfromChannelDescription":emailfromChannelDescription,
-            }
-            if allow:
-                yield item
+                metricProfileNumberOfPosts = user.get("edge_owner_to_timeline_media",{}).get("count",0)
+                subscribers = user.get("edge_followed_by",{}).get('count',0)
+                linksFromProfileDescription = ",".join(self.link_extractor.find_urls(profileDescription))
+                keyword = keyword
+                emailfromChannelDescription = ",".join(self.email_regx.findall(profileDescription))
+                canMessage = user.get("business_category_name")
+                allow = self.allowed(subscribers, min_subs, cutoffdays, metric_LastUploadDate)
+                item = {
+                    "channelId":userId,
+                    "channelName":profileName,
+                    "channelURL":profileUrl,
+                    "metric_Subscribers":subscribers,
+                    "channelDescription":profileDescription,
+                    "canMessage":True if canMessage else False,
+                    "metric_ChannelNumberOfPosts":metricProfileNumberOfPosts,
+                    "metric_LastUploadDate":metric_LastUploadDate,
+                    "metric_Last30PostsDatePostedAndComments":metric_Last30PostsDatePostedAndComments,
+                    "metric_Last30PostsDatePostedAndReactions":metric_Last30PostsDatePostedAndReactions,
+                    "text_30LatestPostsDescription":text_30LatestPostsDescription,
+                    "linksfrom30LatestPosts":linksFrom30LatestPosts,
+                    "emailFromLatestPostDescription":emailFromLatestPostDescription,
+                    "linksFromProfileDescription":linksFromProfileDescription,
+                    "emailfromChannelDescription":emailfromChannelDescription,
+                }
+                if allow:
+                    yield item
 
 
     def allowed(self, metric_Subscribers, min_subs, cutoffdays, metric_LastUploadDate):
@@ -143,7 +144,7 @@ class InstaScraper(scrapy.Spider):
     
 
 crawler = CrawlerProcess(settings={
-    "HTTPCACHE_ENABLED": True,
+    "HTTPCACHE_ENABLED": False,
     "DOWNLOAD_DELAY": 10,
     "CONCURRENT_REQUESTS": 1,
 })
