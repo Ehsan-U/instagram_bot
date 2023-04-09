@@ -33,7 +33,6 @@ class InstaScraper(scrapy.Spider):
             url = f'https://www.instagram.com/api/v1/users/web_profile_info/?username={username}'
             headers = self.update_referer(self.session_headers, username)
             yield scrapy.Request(url, callback=self.parse_user, headers=headers, cookies=self.session_cookies, cb_kwargs={"keyword":keyword, "iDOutRequest":iDOutRequest, "min_subs":min_subs,"cutoffdays":cutoffdays})
-            # break
 
 
     def parse_user(self, response, keyword, iDOutRequest, min_subs, cutoffdays):
@@ -48,14 +47,7 @@ class InstaScraper(scrapy.Spider):
             if posts:
                 posts = posts[:30]
                 metric_LastUploadDate = self.to_date(posts[0].get("node",{}).get("taken_at_timestamp"))
-                # metric_Last30PostsDatePostedAndComments = ",".join([f'{self.to_date(post.get("node", {}).get("taken_at_timestamp"))}:{post.get("node",{}).get("edge_media_to_comment",{}).get("count")}' for post in posts])
-                # metric_Last30PostsDatePostedAndReactions = ",".join([f'{self.to_date(post.get("node", {}).get("taken_at_timestamp"))}:{post.get("node",{}).get("edge_liked_by",{}).get("count")}' for post in posts])
-                # linksFrom30LatestPosts = ",".join(self.link_extractor.find_urls(self.get_text(posts)))
-                # text_30LatestPostsDescription = self.get_text(posts)
-                # emailFromLatestPostDescription = ",".join(self.email_regx.findall(self.get_text(posts[0:1])))
-                # metricProfileNumberOfPosts = user.get("edge_owner_to_timeline_media",{}).get("count",0)
                 subscribers = user.get("edge_followed_by",{}).get('count',0)
-                # linksFromProfileDescription = ",".join(self.link_extractor.find_urls(profileDescription))
                 keyword = keyword
                 emailfromChannelDescription = ",".join(self.email_regx.findall(profileDescription))
                 canMessage = user.get("business_category_name")
@@ -70,14 +62,7 @@ class InstaScraper(scrapy.Spider):
                     "metric_Subscribers":subscribers,
                     "channelDescription":profileDescription,
                     "canMessage":True if canMessage else False,
-                    # "metric_ChannelNumberOfPosts":metricProfileNumberOfPosts,
                     "metric_LastUploadDate":self.to_us_eastern(metric_LastUploadDate),
-                    # "metric_Last30PostsDatePostedAndComments":metric_Last30PostsDatePostedAndComments,
-                    # "metric_Last30PostsDatePostedAndReactions":metric_Last30PostsDatePostedAndReactions,
-                    # "text_30LatestPostsDescription":text_30LatestPostsDescription,
-                    # "linksfrom30LatestPosts":linksFrom30LatestPosts,
-                    # "emailFromLatestPostDescription":emailFromLatestPostDescription,
-                    # "linksFromProfileDescription":linksFromProfileDescription,
                     "emailfromChannelDescription":emailfromChannelDescription,
                 }
                 if allow:
