@@ -7,7 +7,9 @@ from scrapy import signals
 from copy import deepcopy
 from datetime import datetime
 from urlextract import URLExtract
-
+from pprint import pprint
+from urllib.parse import urlparse
+import pytz
 
 
 
@@ -21,62 +23,65 @@ class InstaScraper(scrapy.Spider):
         for keyword in self.keywords:
             url = f'https://www.instagram.com/api/v1/web/search/topsearch/?context=blended&query={keyword.get("keyword")}&search_surface=web_top_search'
             headers = self.session_headers
-            yield scrapy.Request(url, callback=self.parse_searchResults, headers=headers, cookies=self.session_cookies, cb_kwargs={"keyword":keyword.get("keyword"), "min_subs":keyword.get("minimumNumberofSubscribers"),"cutoffdays":keyword.get("lastUploadCutoffDate")})
+            yield scrapy.Request(url, callback=self.parse_searchResults, headers=headers, cookies=self.session_cookies, cb_kwargs={"keyword":keyword.get("keyword"), "iDOutRequest":keyword.get("iDOutRequest"), "min_subs":keyword.get("minimumNumberofSubscribers"),"cutoffdays":keyword.get("lastUploadCutoffDate")})
 
 
-    def parse_searchResults(self, response, keyword, min_subs, cutoffdays):
+    def parse_searchResults(self, response, keyword, iDOutRequest, min_subs, cutoffdays):
         data = json.loads(response.body)
         for user in data.get("users"):
             username = user.get('user').get('username')
             url = f'https://www.instagram.com/api/v1/users/web_profile_info/?username={username}'
             headers = self.update_referer(self.session_headers, username)
-            yield scrapy.Request(url, callback=self.parse_user, headers=headers, cookies=self.session_cookies, cb_kwargs={"keyword":keyword, "min_subs":min_subs,"cutoffdays":cutoffdays})
+            yield scrapy.Request(url, callback=self.parse_user, headers=headers, cookies=self.session_cookies, cb_kwargs={"keyword":keyword, "iDOutRequest":iDOutRequest, "min_subs":min_subs,"cutoffdays":cutoffdays})
             # break
 
 
-    def parse_user(self, response, keyword, min_subs, cutoffdays):
+    def parse_user(self, response, keyword, iDOutRequest, min_subs, cutoffdays):
         user = json.loads(response.body).get("data",{}).get("user")
         if user:
             userId = user.get("id")
             profileName = user.get("full_name")
             profileUrl = f"https://www.instagram.com/{user.get('username')}/"
+            channelName = next(i for i in urlparse(profileUrl).path.split('/') if i != '')
             profileDescription = user.get("biography",'') + ' ' + user.get("external_url") if user.get("external_url") else ''
             posts = user.get("edge_owner_to_timeline_media",{}).get("edges")
             if posts:
                 posts = posts[:30]
                 metric_LastUploadDate = self.to_date(posts[0].get("node",{}).get("taken_at_timestamp"))
-                metric_Last30PostsDatePostedAndComments = ",".join([f'{self.to_date(post.get("node", {}).get("taken_at_timestamp"))}:{post.get("node",{}).get("edge_media_to_comment",{}).get("count")}' for post in posts])
-                metric_Last30PostsDatePostedAndReactions = ",".join([f'{self.to_date(post.get("node", {}).get("taken_at_timestamp"))}:{post.get("node",{}).get("edge_liked_by",{}).get("count")}' for post in posts])
-                linksFrom30LatestPosts = ",".join(self.link_extractor.find_urls(self.get_text(posts)))
-                text_30LatestPostsDescription = self.get_text(posts)
-                emailFromLatestPostDescription = ",".join(self.email_regx.findall(self.get_text(posts[0:1])))
-                metricProfileNumberOfPosts = user.get("edge_owner_to_timeline_media",{}).get("count",0)
+                # metric_Last30PostsDatePostedAndComments = ",".join([f'{self.to_date(post.get("node", {}).get("taken_at_timestamp"))}:{post.get("node",{}).get("edge_media_to_comment",{}).get("count")}' for post in posts])
+                # metric_Last30PostsDatePostedAndReactions = ",".join([f'{self.to_date(post.get("node", {}).get("taken_at_timestamp"))}:{post.get("node",{}).get("edge_liked_by",{}).get("count")}' for post in posts])
+                # linksFrom30LatestPosts = ",".join(self.link_extractor.find_urls(self.get_text(posts)))
+                # text_30LatestPostsDescription = self.get_text(posts)
+                # emailFromLatestPostDescription = ",".join(self.email_regx.findall(self.get_text(posts[0:1])))
+                # metricProfileNumberOfPosts = user.get("edge_owner_to_timeline_media",{}).get("count",0)
                 subscribers = user.get("edge_followed_by",{}).get('count',0)
-                linksFromProfileDescription = ",".join(self.link_extractor.find_urls(profileDescription))
+                # linksFromProfileDescription = ",".join(self.link_extractor.find_urls(profileDescription))
                 keyword = keyword
                 emailfromChannelDescription = ",".join(self.email_regx.findall(profileDescription))
                 canMessage = user.get("business_category_name")
                 allow = self.allowed(subscribers, min_subs, cutoffdays, metric_LastUploadDate)
                 item = {
+                    "keyword":keyword,
+                    "iDOutRequest": iDOutRequest,
                     "channelId":userId,
-                    "channelName":profileName,
+                    "channelName":channelName,
+                    "personName": profileName,
                     "channelURL":profileUrl,
                     "metric_Subscribers":subscribers,
                     "channelDescription":profileDescription,
                     "canMessage":True if canMessage else False,
-                    "metric_ChannelNumberOfPosts":metricProfileNumberOfPosts,
-                    "metric_LastUploadDate":metric_LastUploadDate,
-                    "metric_Last30PostsDatePostedAndComments":metric_Last30PostsDatePostedAndComments,
-                    "metric_Last30PostsDatePostedAndReactions":metric_Last30PostsDatePostedAndReactions,
-                    "text_30LatestPostsDescription":text_30LatestPostsDescription,
-                    "linksfrom30LatestPosts":linksFrom30LatestPosts,
-                    "emailFromLatestPostDescription":emailFromLatestPostDescription,
-                    "linksFromProfileDescription":linksFromProfileDescription,
+                    # "metric_ChannelNumberOfPosts":metricProfileNumberOfPosts,
+                    "metric_LastUploadDate":self.to_us_eastern(metric_LastUploadDate),
+                    # "metric_Last30PostsDatePostedAndComments":metric_Last30PostsDatePostedAndComments,
+                    # "metric_Last30PostsDatePostedAndReactions":metric_Last30PostsDatePostedAndReactions,
+                    # "text_30LatestPostsDescription":text_30LatestPostsDescription,
+                    # "linksfrom30LatestPosts":linksFrom30LatestPosts,
+                    # "emailFromLatestPostDescription":emailFromLatestPostDescription,
+                    # "linksFromProfileDescription":linksFromProfileDescription,
                     "emailfromChannelDescription":emailfromChannelDescription,
                 }
                 if allow:
-                    yield item
-
+                    pprint(item)
 
     def allowed(self, metric_Subscribers, min_subs, cutoffdays, metric_LastUploadDate):
         if metric_Subscribers <= min_subs:
@@ -134,6 +139,15 @@ class InstaScraper(scrapy.Spider):
         return text
 
 
+    @staticmethod
+    def to_us_eastern(date_str):
+        given_date = datetime.strptime(date_str, "%Y-%m-%d")
+        us_eastern = pytz.timezone('US/Eastern')
+        localized_date = us_eastern.localize(given_date)
+        formatted_date = localized_date.strftime('%Y-%m-%d %H:%M:%S %Z')
+        return formatted_date
+
+
     def spider_opened(self, spider):
         with open("session.json", 'r') as f:
             config = json.load(f)
@@ -144,7 +158,7 @@ class InstaScraper(scrapy.Spider):
     
 
 crawler = CrawlerProcess(settings={
-    "HTTPCACHE_ENABLED": False,
+    "HTTPCACHE_ENABLED": True,
     "DOWNLOAD_DELAY": 10,
     "CONCURRENT_REQUESTS": 1,
 })
