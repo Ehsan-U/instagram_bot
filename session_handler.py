@@ -48,6 +48,8 @@ class Session_Handler():
                 'cookies': deepcopy(cookies),
             }
             self.save_cookies(config)
+        except Exception:
+            pass
         finally:
             self.driver.close()
 
