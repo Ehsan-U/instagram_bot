@@ -1,3 +1,4 @@
+import argparse
 import scrapy
 from scrapy.crawler import CrawlerProcess
 import json
@@ -141,11 +142,14 @@ class InstaScraper(scrapy.Spider):
             self.session_headers = self.update_headers(self.session_cookies, deepcopy(HEADERS), app_id)
             
     
+########################
+
+
 
 crawler = CrawlerProcess(settings={
     "HTTPCACHE_ENABLED": True,
     "DOWNLOAD_DELAY": 10,
     "CONCURRENT_REQUESTS": 1,
 })
-crawler.crawl(InstaScraper, keywords=[{"keyword":'scrapy',"iDOutRequest":1, "minimumNumberofSubscribers":10, "lastUploadCutoffDate":100}])
+crawler.crawl(InstaScraper, keywords=[{"keyword":'scrapy',"iDOutRequest":1, "minimumNumberofSubscribers":10, "lastUploadCutoffDate":30}])
 crawler.start()
