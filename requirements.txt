@@ -2,3 +2,5 @@ selenium
 scrapy
 urlextract
 webdriver_manager
+pytz
+webdriver_manager
