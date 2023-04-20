@@ -5,8 +5,6 @@ from webdriver_manager.chrome import ChromeDriverManager
 import json 
 import re
 from copy import deepcopy
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
 from selenium.common.exceptions import NoSuchElementException
 
@@ -20,6 +18,7 @@ class Session_Handler():
         s=Service(ChromeDriverManager().install())
         systm = os.getlogin()
         opt = ChromeOptions()
+        opt.add_experimental_option('excludeSwitches', ['enable-logging'])
         opt.add_argument("--profile-directory=Default")
         opt.add_argument(f"--user-data-dir=C:\\Users\\{systm}\\AppData\\Local\\Google\\Chrome\\User Data\\")
         self.driver = Chrome(service=s, options=opt)
@@ -56,7 +55,6 @@ class Session_Handler():
 
 session = Session_Handler()
 session.get_cookies()
-
 
 
 
