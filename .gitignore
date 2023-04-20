@@ -5,3 +5,4 @@ session.json
 data_samples/
 __pycache__/
 instagram_bot.zip
+.idea/
